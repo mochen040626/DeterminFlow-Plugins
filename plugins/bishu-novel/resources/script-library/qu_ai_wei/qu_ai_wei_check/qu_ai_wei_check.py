@@ -9,6 +9,7 @@ import subprocess
 import sys
 import os
 import json
+import shutil
 
 
 def main():
@@ -35,6 +36,12 @@ def main():
         print(f"Input file is empty: {input_file}")
         sys.exit(1)
 
+    # 解析 npx 的真实路径（Windows 下是 npx.cmd）
+    npx_path = shutil.which("npx")
+    if not npx_path:
+        print("npx not found. Please ensure Node.js is installed and in PATH.")
+        sys.exit(1)
+
     # 构造传给 skill 的参数
     payload = json.dumps({
         "input": text_content
@@ -42,7 +49,7 @@ def main():
 
     # 调用 qu-ai-wei skill
     cmd = [
-        "npx", "skills", "run",
+        npx_path, "skills", "run",
         "hardydai-cell/qu-ai-wei",
         "--skill", "去AI味",
         "-p", payload
@@ -59,8 +66,8 @@ def main():
     except subprocess.TimeoutExpired:
         print("qu-ai-wei processing timed out")
         sys.exit(1)
-    except FileNotFoundError:
-        print("npx not found. Please ensure Node.js is installed and in PATH.")
+    except FileNotFoundError as e:
+        print(f"Failed to launch npx: {e}")
         sys.exit(1)
 
     if result.returncode != 0:

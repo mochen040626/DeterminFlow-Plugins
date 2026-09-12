@@ -9,6 +9,7 @@ import subprocess
 import sys
 import os
 import json
+import shutil
 
 
 def main():
@@ -31,6 +32,12 @@ def main():
         print(f"Failed to read chapter file: {e}")
         sys.exit(1)
 
+    # 解析 npx 的真实路径（Windows 下是 npx.cmd）
+    npx_path = shutil.which("npx")
+    if not npx_path:
+        print("npx not found. Please ensure Node.js is installed and in PATH.")
+        sys.exit(1)
+
     # 构造传给 skill 的参数
     payload = json.dumps({
         "chapter_file": chapter_file,
@@ -39,9 +46,8 @@ def main():
     }, ensure_ascii=False)
 
     # 调用 long-novel-writer skill
-    # 注意：具体命令格式需要根据 long-novel-writer 的实际 SKILL.md 调整
     cmd = [
-        "npx", "skills", "run",
+        npx_path, "skills", "run",
         "jiaw-Zh/long-novel-writer",
         "-p", payload
     ]
@@ -57,8 +63,8 @@ def main():
     except subprocess.TimeoutExpired:
         print("long-novel-writer validation timed out")
         sys.exit(1)
-    except FileNotFoundError:
-        print("npx not found. Please ensure Node.js is installed and in PATH.")
+    except FileNotFoundError as e:
+        print(f"Failed to launch npx: {e}")
         sys.exit(1)
 
     # 输出 skill 的返回内容
