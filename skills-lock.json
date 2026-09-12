@@ -6,6 +6,12 @@
       "sourceType": "github",
       "skillPath": "skill/long-novel-writer/SKILL.md",
       "computedHash": "e0d5b8f41b1513602787ce9030c7cb8d4739c84ee3bad2b73adba2e648183b82"
+    },
+    "去AI味": {
+      "source": "hardydai-cell/qu-ai-wei",
+      "sourceType": "github",
+      "skillPath": "skills/qu-ai-wei/SKILL.md",
+      "computedHash": "cac561a5d29715ee1570e5c5220018f062b1e5908b7bf67e52c3df125ecf290f"
     }
   }
 }

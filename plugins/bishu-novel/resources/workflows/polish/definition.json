@@ -161,6 +161,39 @@
       "output_file_path": "",
       "sub_workflow_params": {},
       "fail_auto_skip": false
+    },
+    {
+      "id": "script_qu_ai_wei",
+      "label": "去 AI 味处理",
+      "node_type": "script",
+      "agent_type": "default",
+      "system_prompt_template": "",
+      "first_message": "",
+      "position": {
+        "x": 1000,
+        "y": 250
+      },
+      "var_bindings": {},
+      "node_params": {
+        "script_source": "library",
+        "script_type": "shell",
+        "script_group": "qu_ai_wei",
+        "script_name": "qu_ai_wei_check",
+        "script_argv": [
+          "story/{{chapter_number}}/chapter.md",
+          "story/{{chapter_number}}/chapter.md"
+        ],
+        "timeout": "600"
+      },
+      "auto_flow": true,
+      "enable_complete_node_task": false,
+      "output_variable": "",
+      "enable_reject_upstream": false,
+      "max_reject_count": 0,
+      "save_output_to_file": false,
+      "output_file_path": "",
+      "sub_workflow_params": {},
+      "fail_auto_skip": false
     }
   ],
   "edges": [
@@ -190,8 +223,13 @@
       "target": "script_polish_post"
     },
     {
-      "id": "edge-polish_post-sync_polish",
+      "id": "edge-polish_post-qu",
       "source": "script_polish_post",
+      "target": "script_qu_ai_wei"
+    },
+    {
+      "id": "edge-qu-sync_polish",
+      "source": "script_qu_ai_wei",
       "target": "script_sync_polish"
     },
     {
