@@ -1,17 +1,14 @@
 ---
-name: 去AI味
+name: qu_ai_wei
 description: |
   去除中文文本中的 AI 写作痕迹，也就是常说的"去 AI 味"。适用于编辑、审阅、改写文章、报告、脚本、文案和说明文字，
   让文本更自然、更具体、更像真人写作。重点处理中文语境中的长句、提纲式拼接、抽象名词堆叠、
   互联网/商务黑话、宏大空话、AI 口吻过渡词、否定式排比、模糊归因和通用乐观结尾。
-allowed-tools:
-  - Read
-  - Write
-  - Edit
-  - AskUserQuestion
 metadata:
-  trigger: 编辑或审阅中文文本，去除 AI 写作痕迹，去 AI 味
-  source: 基于 blader/humanizer、hardikpandya/stop-slop 和 Wikipedia:Signs of AI writing，并做中文语境适配
+  display_name: 去 AI 味
+  version: 1.0.0
+  category: quality
+  workflow_only: true
 ---
 
 # 去AI味

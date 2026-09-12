@@ -750,12 +750,13 @@
         "novel_quality"
       ],
       "visible_rule_group_ids": [],
-      "include_skills": true,
-      "include_rules": false,
       "model_params": {
         "thinking_enabled": true,
         "reasoning_effort": "high",
         "temperature": 0.2,
+        "top_p": 1,
+        "presence_penalty": 0,
+        "thinking_budget": null,
         "response_format": {
           "type": "json_object"
         }
@@ -774,12 +775,13 @@
         "novel_quality"
       ],
       "visible_rule_group_ids": [],
-      "include_skills": true,
-      "include_rules": false,
       "model_params": {
         "thinking_enabled": true,
         "reasoning_effort": "high",
         "temperature": 0.6,
+        "top_p": 1,
+        "presence_penalty": 0,
+        "thinking_budget": null,
         "response_format": {
           "type": "json_object"
         }

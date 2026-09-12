@@ -5,11 +5,11 @@
       "group_ids": ["default"],
       "auto_inject": true
     },
-    "long_novel_writer": {
+    "qu_ai_wei": {
       "group_ids": ["novel_quality"],
       "auto_inject": false
     },
-    "qu_ai_wei": {
+    "long_novel_writer": {
       "group_ids": ["novel_quality"],
       "auto_inject": false
     }
@@ -21,13 +21,13 @@
       "auto_inject": true,
       "workflow_only": false
     },
-    "long_novel_writer": {
+    "qu_ai_wei": {
       "enabled": true,
       "priority": 50,
       "auto_inject": false,
       "workflow_only": true
     },
-    "qu_ai_wei": {
+    "long_novel_writer": {
       "enabled": true,
       "priority": 50,
       "auto_inject": false,
