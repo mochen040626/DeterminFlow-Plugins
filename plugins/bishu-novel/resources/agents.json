@@ -736,6 +736,54 @@
           "type": "json_object"
         }
       }
+    },
+    "lnw_validator": {
+      "description": "加载 long-novel-writer 规则，对章节进行正典与连续性校验",
+      "prompt_template": "novel-single-writer",
+      "tools": null,
+      "disallowed_tools": null,
+      "max_turns": 1,
+      "system_prompt_template": "",
+      "copy_main_workspace": false,
+      "available_for_sub_session": false,
+      "visible_skill_group_ids": [
+        "novel_quality"
+      ],
+      "visible_rule_group_ids": [],
+      "include_skills": true,
+      "include_rules": false,
+      "model_params": {
+        "thinking_enabled": true,
+        "reasoning_effort": "high",
+        "temperature": 0.2,
+        "response_format": {
+          "type": "json_object"
+        }
+      }
+    },
+    "qu_ai_wei_polisher": {
+      "description": "加载 qu-ai-wei 规则，对章节正文进行中文去 AI 味改写",
+      "prompt_template": "novel-single-writer",
+      "tools": null,
+      "disallowed_tools": null,
+      "max_turns": 1,
+      "system_prompt_template": "",
+      "copy_main_workspace": false,
+      "available_for_sub_session": false,
+      "visible_skill_group_ids": [
+        "novel_quality"
+      ],
+      "visible_rule_group_ids": [],
+      "include_skills": true,
+      "include_rules": false,
+      "model_params": {
+        "thinking_enabled": true,
+        "reasoning_effort": "high",
+        "temperature": 0.6,
+        "response_format": {
+          "type": "json_object"
+        }
+      }
     }
   }
 }

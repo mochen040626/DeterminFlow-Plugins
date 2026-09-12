@@ -658,37 +658,20 @@
       "fail_auto_skip": false
     },
     {
-      "id": "script_lnw_check",
+      "id": "agent_lnw_validator",
       "label": "long-novel-writer 校验",
-      "node_type": "script",
-      "agent_type": "default",
-      "system_prompt_template": "",
-      "first_message": "",
+      "node_type": "agent",
+      "agent_type": "lnw_validator",
+      "first_message": "请严格按照 long-novel-writer 的规则，对以下章节进行校验。\n\n==== 章节正文 ====\n{{chapter_file}}\n\n输出纯 JSON：{\"passed\": true/false, \"issues\": []}",
+      "auto_flow": true,
+      "enable_reject_upstream": true,
+      "max_reject_count": 3,
+      "save_output_to_file": true,
+      "output_file_path": "cache/lnw/validation.json",
       "position": {
         "x": 2000,
         "y": 510
-      },
-      "var_bindings": {},
-      "node_params": {
-        "script_source": "library",
-        "script_type": "python",
-        "script_group": "lnw",
-        "script_name": "lnw_check",
-        "script_argv": [
-          "story/{{chapter_number}}/chapter.md",
-          "."
-        ],
-        "timeout": "600"
-      },
-      "auto_flow": true,
-      "enable_complete_node_task": false,
-      "output_variable": "",
-      "enable_reject_upstream": true,
-      "max_reject_count": 3,
-      "save_output_to_file": false,
-      "output_file_path": "",
-      "sub_workflow_params": {},
-      "fail_auto_skip": false
+      }
     },
     {
       "id": "script_si_post",

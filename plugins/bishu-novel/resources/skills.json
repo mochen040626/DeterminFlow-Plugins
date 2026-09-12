@@ -2,10 +2,16 @@
   "version": "1.0",
   "skills": {
     "writing-assistant": {
-      "group_ids": [
-        "default"
-      ],
+      "group_ids": ["default"],
       "auto_inject": true
+    },
+    "long_novel_writer": {
+      "group_ids": ["novel_quality"],
+      "auto_inject": false
+    },
+    "qu_ai_wei": {
+      "group_ids": ["novel_quality"],
+      "auto_inject": false
     }
   },
   "skill_configs": {
@@ -14,7 +20,25 @@
       "priority": 70,
       "auto_inject": true,
       "workflow_only": false
+    },
+    "long_novel_writer": {
+      "enabled": true,
+      "priority": 50,
+      "auto_inject": false,
+      "workflow_only": true
+    },
+    "qu_ai_wei": {
+      "enabled": true,
+      "priority": 50,
+      "auto_inject": false,
+      "workflow_only": true
     }
   },
-  "groups": []
+  "groups": [
+    {
+      "id": "novel_quality",
+      "name": "小说质量工具",
+      "description": "long-novel-writer 校验与 qu-ai-wei 去 AI 味"
+    }
+  ]
 }

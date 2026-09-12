@@ -163,37 +163,18 @@
       "fail_auto_skip": false
     },
     {
-      "id": "script_qu_ai_wei",
+      "id": "agent_qu_ai_wei",
       "label": "去 AI 味处理",
-      "node_type": "script",
-      "agent_type": "default",
-      "system_prompt_template": "",
-      "first_message": "",
+      "node_type": "agent",
+      "agent_type": "qu_ai_wei_polisher",
+      "first_message": "请严格按照 qu-ai-wei 的规则，改写以下章节正文，去除 AI 写作痕迹。直接输出改写后的纯文本。\n\n==== 章节正文 ====\n{{chapter_file}}",
+      "auto_flow": true,
+      "save_output_to_file": true,
+      "output_file_path": "cache/qu_ai_wei/polished_body.txt",
       "position": {
         "x": 1000,
         "y": 250
-      },
-      "var_bindings": {},
-      "node_params": {
-        "script_source": "library",
-        "script_type": "python",
-        "script_group": "qu_ai_wei",
-        "script_name": "qu_ai_wei_check",
-        "script_argv": [
-          "story/{{chapter_number}}/chapter.md",
-          "story/{{chapter_number}}/chapter.md"
-        ],
-        "timeout": "600"
-      },
-      "auto_flow": true,
-      "enable_complete_node_task": false,
-      "output_variable": "",
-      "enable_reject_upstream": false,
-      "max_reject_count": 0,
-      "save_output_to_file": false,
-      "output_file_path": "",
-      "sub_workflow_params": {},
-      "fail_auto_skip": false
+      }
     }
   ],
   "edges": [
