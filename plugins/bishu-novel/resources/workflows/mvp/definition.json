@@ -671,16 +671,14 @@
       "var_bindings": {},
       "node_params": {
         "script_source": "library",
-        "script_type": "shell",
+        "script_type": "python",
         "script_group": "lnw",
         "script_name": "lnw_check",
         "script_argv": [
-          "--chapter",
-          "{{chapter_file}}",
-          "--workspace",
-          "{{workspace}}"
+          "story/{{chapter_number}}/chapter.md",
+          "."
         ],
-        "timeout": "300"
+        "timeout": "600"
       },
       "auto_flow": true,
       "enable_complete_node_task": false,

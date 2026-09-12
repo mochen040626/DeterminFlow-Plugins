@@ -176,7 +176,7 @@
       "var_bindings": {},
       "node_params": {
         "script_source": "library",
-        "script_type": "shell",
+        "script_type": "python",
         "script_group": "qu_ai_wei",
         "script_name": "qu_ai_wei_check",
         "script_argv": [
