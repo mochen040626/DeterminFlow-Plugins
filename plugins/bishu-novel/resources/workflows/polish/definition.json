@@ -206,11 +206,11 @@
     {
       "id": "edge-polish_post-qu",
       "source": "script_polish_post",
-      "target": "script_qu_ai_wei"
+      "target": "agent_qu_ai_wei"
     },
     {
       "id": "edge-qu-sync_polish",
-      "source": "script_qu_ai_wei",
+      "source": "agent_qu_ai_wei",
       "target": "script_sync_polish"
     },
     {

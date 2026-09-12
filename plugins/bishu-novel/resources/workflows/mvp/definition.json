@@ -1092,10 +1092,10 @@
     },
     {
       "source": "agent_sw",
-      "target": "script_lnw_check"
+      "target": "agent_lnw_validator"
     },
     {
-      "source": "script_lnw_check",
+      "source": "agent_lnw_validator",
       "target": "script_si_post"
     },
     {
