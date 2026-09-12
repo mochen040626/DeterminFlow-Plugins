@@ -658,6 +658,41 @@
       "fail_auto_skip": false
     },
     {
+      "id": "script_lnw_check",
+      "label": "long-novel-writer 校验",
+      "node_type": "script",
+      "agent_type": "default",
+      "system_prompt_template": "",
+      "first_message": "",
+      "position": {
+        "x": 2000,
+        "y": 510
+      },
+      "var_bindings": {},
+      "node_params": {
+        "script_source": "library",
+        "script_type": "shell",
+        "script_group": "lnw",
+        "script_name": "lnw-check",
+        "script_argv": [
+          "--chapter",
+          "{{chapter_file}}",
+          "--workspace",
+          "{{workspace}}"
+        ],
+        "timeout": "300"
+      },
+      "auto_flow": true,
+      "enable_complete_node_task": false,
+      "output_variable": "",
+      "enable_reject_upstream": true,
+      "max_reject_count": 3,
+      "save_output_to_file": false,
+      "output_file_path": "",
+      "sub_workflow_params": {},
+      "fail_auto_skip": false
+    },
+    {
       "id": "script_si_post",
       "label": "SI 后处理",
       "node_type": "script",
@@ -1075,8 +1110,11 @@
       }
     },
     {
-      "id": "edge-agent_sw-script_si_post",
       "source": "agent_sw",
+      "target": "script_lnw_check"
+    },
+    {
+      "source": "script_lnw_check",
       "target": "script_si_post"
     },
     {

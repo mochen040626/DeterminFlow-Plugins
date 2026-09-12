@@ -1,0 +1,143 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { CliError, emitError, atomicWrite } = require('./cap-utils');
+
+function argsOf(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) args[argv[i].slice(2)] = argv[++i];
+  return args;
+}
+
+function safeName(value) {
+  const cleaned = String(value || '').normalize('NFKC').replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/\.+$/g, '').trim();
+  if (!cleaned || cleaned === '.' || cleaned === '..') throw new CliError('INVALID_TITLE', '书名清理后为空', { title: value });
+  return cleaned.slice(0, 80);
+}
+
+function md(title, fields) {
+  return `# ${title}\n\n${fields.map(([key, value]) => `## ${key}\n\n${value}\n`).join('\n')}`;
+}
+
+function templates(meta) {
+  const pending = '待首次策划填写；未知项须显式标为“未知”，不得伪造。';
+  return {
+    'settings/story-bible.md': md('故事圣经', [['项目', meta.title], ['题材', meta.genre], ['一句话卖点', pending], ['世界规则', pending], ['边界与禁区', pending]]),
+    'settings/characters.md': md('人物表', [['主角', pending], ['主要配角', pending], ['角色弧线', pending]]),
+    'settings/relations.md': md('关系台账', [['关系边', '记录：角色A｜角色B｜当前张力｜最近变化｜证据章节。']]),
+    'settings/reader-contract.md': md('读者契约', [['目标读者', pending], ['核心承诺', pending], ['回报节奏', pending], ['禁忌', pending]]),
+    'settings/author-intent.md': md('\u4f5c\u8005\u610f\u56fe', [['\u957f\u671f\u8bfb\u8005\u627f\u8bfa', pending], ['\u6838\u5fc3\u60c5\u7eea\u56de\u62a5', pending], ['\u9898\u6750\u8fb9\u754c', pending], ['\u5b8c\u7ed3\u6263\u9898', pending]]),
+    'settings/context-policy.json': `${JSON.stringify({ schema_version: '1.0', context_budget_chars: 40000, recent_chapters: 3, cold_memories: 3 }, null, 2)}\n`,
+    'settings/style-guide.md': md('\u6587\u4f53\u89c4\u8303', [['\u53d9\u4e8b\u89c6\u89d2', pending], ['\u8bed\u4f53\u4e0e\u8282\u594f', '\u6bcf\u7ae0 2400-3200 \u5b57\uff1b2000 \u5b57\u4ee5\u4e0b\u4e3a\u786c\u4ef6\u5931\u8d25'], ['\u7981\u7528\u6a21\u5f0f', pending], ['\u6837\u53e5', pending]]),
+    'settings/platform-contract.md': md('平台合同', [['平台', meta.genre === '未指定' ? '待首次策划确认' : '番茄小说（以官方页面为准）'], ['官方来源', '记录作家课堂、推荐区、福利/规则页面 URL 与抓取时间。'], ['硬事实', '只填写官方页面明确出现的规则、功能和活动。'], ['启发性信号', '榜单、样本书和第三方文章只作为待验证线索，不写成永久阈值。'], ['开篇验证', '书名/简介承诺、前3章回报、读者理解、继续阅读意愿。'], ['完结验证', '主线回收、伏笔状态、作品完结检查和交付清单。']]),
+    'settings/platform-classroom-map.md': '# 番茄作家课堂采用表\n\n> 初始化后先读取 `references/platform/fanqie-writer-classroom-playbook.md`，再把本书采用的规则、证据和例外写入下表。\n\n| 课堂模块 | 本书采用规则 | 证据文件 | 验收状态 |\n|---|---|---|---|\n| 平台认知 | 待填写 | evidence/sources/writer-classroom-index.md | 未完成 |\n| 产品功能 | 待填写 | evidence/sources/writer-classroom-index.md | 未完成 |\n| 题材选择 | 待填写 | analysis/trend-report.md | 未完成 |\n| 前期准备 | 待填写 | settings/outline/ | 未完成 |\n| 正文写作 | 待填写 | outline/chapter-beats.md | 未完成 |\n| 写作进阶 | 待填写 | evidence/snapshots/ | 未完成 |\n',
+    'settings/workflow-policy.json': `${JSON.stringify({ schema_version: '1.0', workflow_id: 'book-production', workflow_manifest: 'references/operations/workflow-manifest.json', max_attempts_per_node: 3, node_local_context: true, post_hoc_required_after_chapter: true }, null, 2)}\n`,
+    'settings/agent-runner.json': `${JSON.stringify({ schema_version: '1.1', agent_command: 'claude', model: '', agent_args: ['--dangerously-skip-permissions', '--no-session-persistence'], timeout_ms: 900000, max_attempts: 3, chapter_min_chars: 2000, chapter_max_chars: null, panel_readers: 5, panel_models: [], panel_roles: ['fanqie-editor', 'serial-reader', 'webnovel-structure', 'prose-editor', 'continuity-auditor'], panel_attempts: 2, review_interval: 10, chapter_revision_passes: 2, chapter_reader_review: true, chapter_reader_min_score: 7, chapter_fact_extract: true, chapter_foreshadowing_reconcile: true }, null, 2)}\n`,
+    'settings/fanqie-style-card.json': `${JSON.stringify({ schema_version: '1.0', intent: 'Positive Fanqie-style craft targets for mobile serial prose.', targets: { dialogue_share_min: 0.12, action_per_1000_chars_min: 7, emotion_per_1000_chars_min: 3, short_paragraph_ratio_min: 0.82, visible_payoff_required: true, information_reveal_required: true, dialogue_tension_required_when_dialogue: true }, rule: 'Targets are diagnosis. A binding chapter card and literal cold-reader evidence decide release.' }, null, 2)}\n`,
+    'settings/publish-adapter.json': `${JSON.stringify({ schema_version: '1.0', enabled: false, adapter_command: '', adapter_args: [], daily_time: '09:00', max_attempts: 3, retry_minutes: 30, rule: 'The adapter must use the logged-in platform session and return JSON { ok: true, platform_id: string }. Queue retries are idempotent by request ID.' }, null, 2)}\n`,
+    'settings/market-sources.json': `${JSON.stringify({ schema_version: '1.1', platform: 'fanqie', pages: ['https://fanqienovel.com/rank/all'], urls: ['https://fanqienovel.com/rank/all'], offline_exports: [], cache: 'evidence/snapshots/ranking-cache.json', min_sample: 10, retry: 2, max_cache_hours: 72, cdp: null, persistent_dir: null, python: 'python', rule: 'The default official ranking page is a starting source; add same-track pages or verified exports when available. A failed acquisition must not be replaced by invented market evidence.' }, null, 2)}\n`,
+    'settings/reviewers/fanqie-editor.md': '# Fanqie editor protocol\n\nAssess title-to-opening promise, mobile-reading rhythm, commercial premise clarity, the first-three-chapter payoff, and chapter-end pull. Reject vague category positioning, delayed central conflict, or an opening that does not match its promise.\n\nReturn only evidence grounded in chapters 1-3.\n',
+    'settings/reviewers/serial-reader.md': '# Serial reader protocol\n\nRead as an ordinary Chinese web-fiction reader deciding whether to tap the next chapter. Assess clarity, emotional involvement, protagonist appeal, immediate stakes, and desire to continue. Reject prose that feels like an essay, summary, outline, or a confusing sequence of events.\n\nReturn only evidence grounded in chapters 1-3.\n',
+    'settings/reviewers/webnovel-structure.md': '# Web-novel structure editor protocol\n\nAssess conflict escalation, information release, cause-and-effect, chapter function, promise and payoff, and the third-chapter cliffhanger. Reject static chapters, false conflict, unearned reversal, or a missing next-reading question.\n\nReturn only evidence grounded in chapters 1-3.\n',
+    'settings/reviewers/prose-editor.md': '# Prose editor protocol\n\nAssess whether scenes are concrete and readable on mobile: action-reaction, dialogue distinction, pacing, sensory detail, and paragraphing. Reject composition-like exposition, chronological-log narration, generic aphorisms, repeated wording, and character voices that collapse into one voice.\n\nReturn only evidence grounded in chapters 1-3.\n',
+    'settings/reviewers/continuity-auditor.md': '# Continuity auditor protocol\n\nAssess character motivation, factual consistency, time and spatial continuity, knowledge boundaries, setup/payoff status, and causal logic. Reject unexplained information, out-of-character decisions, missing causes, and contradictions that damage trust.\n\nReturn only evidence grounded in chapters 1-3.\n',
+    'outline/master-outline.md': md('全书大纲', [['目标字数', String(meta.target_words)], ['开局失衡', pending], ['中点改义', pending], ['最低谷', pending], ['终局选择', pending]]),
+    'outline/chapter-beats.md': '# 章纲\n\n> 章号使用自然数；正文文件名必须补零为四位，例如第1章写作 `manuscript/ch-0001-标题.md`。表格单元格内不要使用 `|`。\n\n| 章号 | POV | 目标 | 阻力 | 转折 | 得失 | 信息增量 | 情绪变化 | 章尾钩子 |\n|---:|---|---|---|---|---|---|---|---|\n',
+    'outline/plot-units.md': '# Plot units\n\n> Each unit spans a bounded run of chapters and records the unit-level drive, setup, turn, payoff, and next promise. Keep it original and compatible with the chapter beats.\n\n| ID | Start | End | Primary drive | Setup | Turn | Payoff | Next |\n|---|---:|---:|---|---|---|---|---|\n',
+    'outline/foreshadowing-ledger.md': '# 伏笔台账\n\n| ID | 埋设章 | 内容 | 强化章 | 回收截止章 | 状态 |\n|---|---:|---|---:|---:|---|\n',
+    'state/current-state.md': '# 当前状态\n\nupdated_through: 0\n\n尚未写入正文。\n',
+    'state/current-focus.md': md('\u5f53\u524d\u521b\u4f5c\u7126\u70b9', [['\u5f53\u524d\u5377\u76ee\u6807', pending], ['\u8fd9\u4e00\u9636\u6bb5\u5fc5\u987b\u4ea4\u4ed8', pending], ['\u8fd9\u4e00\u9636\u6bb5\u4fdd\u62a4\u7684\u8bbe\u5b9a', pending], ['\u4e0b\u4e00\u4e2a\u7ae0\u8282\u7684\u91cd\u70b9', pending]]),
+    'state/foreshadowing-index.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'outline/foreshadowing-ledger.md', target_chapter: null, nodes: [], edges: [], due: [], errors: [], warnings: [] }, null, 2)}\n`,
+    'state/foreshadowing-progress.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, updated_through: 0, plan: 'outline/foreshadowing-ledger.md', fact_ledgers: [], entries: [], errors: [], warnings: [], audit: { planned: 0, active: 0, resolved: 0, overdue: 0, unknown_hook_fact_count: 0 } }, null, 2)}\n`,
+    'state/hook-agenda.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: null, source: 'state/foreshadowing-progress.json', active_hooks: [], must_advance: [], stale_debt: [], eligible_resolve: [], warnings: [], recommendations: [], audit: { active: 0, must_advance: 0, stale_debt: 0, eligible_resolve: 0 } }, null, 2)}\n`,
+    'state/resource-ledger.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: null, source: 'state/fact-ledger', policy: { stale_after_chapters: 12, max_window_resources: 8 }, resources: [], stale_resources: [], due_resources: [], warnings: [], audit: { fact_ledgers: 0, resource_events: 0, active_resources: 0, stale_resources: 0, due_resources: 0, unstructured_resource_facts: 0 } }, null, 2)}\n`,
+    'state/resource-window.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: null, source: 'state/resource-ledger.json', participants: [], resources: [], omitted_count: 0, warnings: [], rule: 'Use only listed resource facts as established.' }, null, 2)}\n`,
+    'state/pacing-ledger.json': `${JSON.stringify({ schema_version: '1.0', updated_at: null, updated_through: 0, entries: [], audit: { warnings: [], recommendations: [] } }, null, 2)}\n`,
+    'state/quality-trend-ledger.json': `${JSON.stringify({ schema_version: '1.0', updated_at: null, updated_through: 0, entries: [], audit: { warnings: [], weakest_dimension: null, recent_average: null, previous_average: null, trend: 'insufficient_data' } }, null, 2)}\n`,
+    'state/quality-guidance.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: 1, source: 'state/quality-trend-ledger.json', window: [], weakest_dimension: null, weakest_chapter: null, trend: 'insufficient_data', warnings: [], recommendations: ['No accepted cold-reader history is available yet. Follow the binding chapter card and reader contract.'], rule: 'This is an evidence-derived diagnostic brief. It cannot override the chapter card, canon, reader contract, or platform contract.' }, null, 2)}\n`,
+    'state/repair-debt-ledger.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, chapter_range: { start: 1, end: null }, revision_budget: 2, entries: [], warnings: [], audit: { root_cause_counts: { repair_loop: 0, contract_delivery: 0, diagnostic_drift: 0, budget_exhausted: 0, unknown: 0 }, root_cause_ratios: { repair_loop: 0, contract_delivery: 0, diagnostic_drift: 0, budget_exhausted: 0, unknown: 0 }, primary_root_cause: 'unknown', top_initial_debt_keys: [], top_repeated_debt_keys: [], unresolved_chapters: [], recommendation: 'No repeated repair debt is available. Follow the binding chapter card and cold-reader report.' } }, null, 2)}\n`,
+    'state/plot-unit-window.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: 1, source: 'outline/plot-units.md', source_sha256: null, enabled: false, unit: null, warnings: [], rule: 'This window guides the active plot unit but cannot override the chapter beat, Canon, reader/platform contract, or literal-evidence gates.' }, null, 2)}\n`,
+    'state/repair-lessons.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: 1, source: 'state/repair-debt-ledger.json', source_sha256: null, min_chapters: 2, lessons: [], warnings: [], rule: 'Lessons are evidence-derived recurring repair constraints. They cannot override the chapter card, canon, reader/platform contract, or literal-evidence gates.' }, null, 2)}\n`,
+    'state/repair-debt-guidance.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: 1, source: 'state/repair-debt-ledger.json', primary_root_cause: 'unknown', top_repeated_debt_keys: [], unresolved_chapters: [], recommendation: 'No repeated repair debt is available. Follow the binding chapter card and cold-reader report.', rule: 'Use this as a repair-process diagnosis. It cannot override the chapter card, accepted canon, reader contract, platform contract, or literal-evidence gates.' }, null, 2)}\n`,
+    'state/character-state.md': '# 人物状态\n\n| 人物 | 地点 | 身体 | 情绪 | 资源 | 已知信息 | 关系变化 | 截止章 |\n|---|---|---|---|---|---|---|---:|\n',
+    'state/timeline.md': '# 时间线\n\n| 时间 | 事件 | 地点 | 参与者 | 证据章节 |\n|---|---|---|---|---|\n',
+    'state/unresolved-hooks.md': '# 未解钩子\n\n| ID | 首次出现章 | 问题 | 读者预期 | 回收窗口 | 状态 |\n|---|---:|---|---|---|---|\n',
+    'state/feedback-ledger.md': '# 反馈台账\n\n> 只记录真实读者/用户反馈；每条反馈都要转成规则、修改动作和复验结果。\n\n| 日期 | 反馈原句 | 问题层 | 规则化动作 | 复验章节 | 状态 |\n|---|---|---|---|---:|---|\n',
+    'state/feedback-rules.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'state/feedback-ledger.md', source_sha256: null, rules: [], warnings: [] }, null, 2)}\n`,
+    'state/style-contract.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'evidence/derivations/style-signals.md', source_sha256: null, signals: [], warnings: [] }, null, 2)}\n`,
+    'state/book-dna.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'evidence/derivations/benchmark-feature-matrix.md', source_sha256: null, boundaries: 'evidence/derivations/source-boundaries.md', boundaries_sha256: null, mechanisms: [], by_dimension: {}, warnings: [], rule: 'Use only abstract multi-source mechanisms; never reuse source text, names, distinctive scenes, plot sequences, settings, or character configurations.' }, null, 2)}\n`,
+    'state/fact-projections.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'state/fact-ledger/index.json', latest_chapter: 0, current: { summaries: [] }, characters: [], timeline: [], unresolved_hooks: [], rule: 'Derived projection only. Make continuity changes by appending a validated chapter fact ledger, never by editing this view.' }, null, 2)}\n`,
+    'state/fact-ledger/index.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, entries: [], latest_chapter: 0, fact_count: 0 }, null, 2)}\n`,
+    'state/longform-health.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, chapter: 0, metrics: {}, warnings: [], next_gate: 'healthy' }, null, 2)}\n`,
+    'state/chapter-quality-brief.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, target_chapter: 1, constraints: [], blocking_warnings: [], rule: 'Derived diagnostic brief.' }, null, 2)}\n`,
+    'state/platform-metrics.json': `${JSON.stringify({ schema_version: '1.1', generated_at: null, entries: [], feedback_rules: [], warnings: [], rule: 'Metrics must be imported from actual platform exports.' }, null, 2)}\n`,
+    'state/platform-feedback-rules.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'state/platform-metrics.json', source_sha256: null, rules: [], warnings: [] }, null, 2)}\n`,
+    'state/publish-queue.json': `${JSON.stringify({ schema_version: '1.0', updated_at: null, items: [] }, null, 2)}\n`,
+    'state/publish-reconciliation.json': `${JSON.stringify({ schema_version: '1.0', reconciled_at: null, published: [], pending: [] }, null, 2)}\n`,
+    'state/character-contracts.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, source: 'evidence/derivations/character-contracts.md', source_sha256: null, characters: [], warnings: [] }, null, 2)}\n`,
+    'state/handoff-current.md': '# 当前会话交接\n\n尚未生成。运行 `node scripts/handoff.js <项目目录>`。\n',
+    'state/autopilot.json': `${JSON.stringify({ schema_version: '1.0', mode: 'supervised', status: 'idle', phase: 'idle', target_words: Number(meta.target_words || 1000000), current_chapter: 0, revision_round: 0, max_revision_rounds: 3, chapter_review_interval: 10, last_review_through: 0, updated_at: null }, null, 2)}\n`,
+    'state/autopilot-pilot.json': `${JSON.stringify({ schema_version: '1.0', status: 'pending', auto_confirmed: false, reviewed_through: 0, updated_at: null }, null, 2)}\n`,
+    'state/chapter-transaction.json': `${JSON.stringify({ schema_version: '1.0', phase: 'idle', chapter: null, updated_at: null }, null, 2)}\n`,
+    'state/workflow-run.json': `${JSON.stringify({ schema_version: '1.0', status: 'idle', task_id: null, workflow_id: 'book-production', current_node: null, completed_nodes: [], checkpoints: [], updated_at: null }, null, 2)}\n`,
+    'state/autopilot-run.json': `${JSON.stringify({ schema_version: '1.0', status: 'idle', phase: 'prepare', target_words: Number(meta.target_words || 1000000), current_chapter: 0, completed_prepare_nodes: [], panel: { status: 'pending', attempts: 0 }, attempts: {}, updated_at: null }, null, 2)}\n`,
+    'state/production-runtime.json': `${JSON.stringify({ schema_version: '1.0', status: 'idle', phase: 'idle', runner: null, workflow: null, pilot: null, updated_at: null, rule: 'Primary orchestration envelope. autopilot-run.json, workflow-run.json, and autopilot-pilot.json are compatibility projections.' }, null, 2)}\n`,
+    'state/pilot-verdict.json': `${JSON.stringify({ schema_version: '1.0', status: 'pending', reviewed_through: 0, reviewer: null, reason: null, updated_at: null }, null, 2)}\n`,
+    'state/production-ledger.jsonl': '',
+    'state/workflow-ledger.jsonl': '',
+    'state/post-hoc-ledger.jsonl': '',
+    'state/autopilot-run-ledger.jsonl': '',
+    'analysis/trend-report.md': '# 趋势报告\n\n尚未执行带来源证据的榜单扫描。\n',
+    'analysis/breakdown.md': '# 拆书报告\n\n尚未导入可分析文本。\n',
+    'analysis/qa-report.md': '# 质量报告\n\n尚未生成正文。\n',
+    'evidence/README.md': '# 证据仓\n\n保存扫榜、来源、拆书、选题、大纲、正文评测和文件依赖。每次运行新增快照，不覆盖历史证据。\n\n- sources/：URL、采集时间、来源等级和摘录\n- snapshots/：不可变扫描快照\n- derivations/：从证据到选题/拆书/大纲的推导\n- lineage/：文件依赖与 SHA-256\n',
+    'evidence/sources/source-index.md': '# 来源索引\n\n| ID | 来源 | URL/路径 | 采集时间 | 等级 | 用途 | 下游文件 |\n|---|---|---|---|---|---|---|\n',
+    'evidence/sources/writer-classroom-index.md': '# 番茄作家课堂来源索引\n\n- 官方入口：https://fanqienovel.com/writer/zone/tutorial\n- 官方课程合集：https://fanqienovel.com/writer/zone/article/7668202929941119038\n- 采集时间：待首次运行时更新\n- 研究批次：2026-08-08；公开栏目共 5 类，课程正文由技能仓库统一归纳到 `references/platform/fanqie-writer-classroom-playbook.md`。\n\n| 类别 | 官方接口/页面 | 读取数量 | 本书采用规则 | 下游文件 |\n|---|---|---:|---|---|\n| 平台宝典 | https://fanqienovel.com/writer/zone/tutorial?tab=5 | 27 | 待填写 | settings/platform-contract.md |\n| 新手专区 | https://fanqienovel.com/writer/zone/tutorial?tab=1 | 45 | 待填写 | analysis/ |\n| 大神专访 | https://fanqienovel.com/writer/zone/tutorial?tab=2 | 68 | 待填写 | evidence/derivations/ |\n| 写作技巧 | https://fanqienovel.com/writer/zone/tutorial?tab=3 | 60 | 待填写 | outline/、manuscript/ |\n| 品类指南 | https://fanqienovel.com/writer/zone/tutorial?tab=4 | 64 | 待填写 | settings/、outline/ |\n',
+    'evidence/snapshots/README.md': '# 扫描快照\n\n文件名使用日期和运行 ID；保留原始响应或导出摘要，不用新结果覆盖旧文件。\n',
+    'evidence/derivations/decision-log.md': '# 推导决策日志\n\n| 决策 ID | 日期 | 输入证据 | 决策 | 影响 | 状态 |\n|---|---|---|---|---|---|\n',
+    'evidence/derivations/style-signals.md': '# 风格信号采纳表\n\n> 先从扫榜、拆书、读者反馈或自有样稿中提炼抽象写法；专名、剧情、独特句子和角色口头禅保留在来源证据中，不写入本表。仅“采纳”行会进入章节写作与冷读门禁。\n\n| ID | 维度 | 可复用信号 | 证据来源 | 适用范围 | 状态 |\n|---|---|---|---|---|---|\n| STYLE-001 | 叙事 | 待填写 | evidence/sources/source-index.md | 全书 | 待填写 |\n',
+    'evidence/derivations/benchmark-pool.md': '# 同赛道标杆池\n\n> 选入同赛道的 10–20 本表现作品。这里记录来源和入选理由；正文、章节卡与 Book DNA 仅消费抽象机制，不消费作品表达。\n\n| 标杆 ID | 作品/匿名代号 | 赛道 | 入选依据 | 可观察范围 | 来源证据 | 状态 |\n|---|---|---|---|---|---|---|\n| B01 | 待填写 | 待填写 | 待填写 | 待填写 | evidence/sources/source-index.md | 待填写 |\n',
+    'evidence/derivations/benchmark-feature-matrix.md': '# 多书特征矩阵\n\n> 每条采纳机制至少来自两本标杆。填写“机制”，不要填写原书专名、角色、情节链、独特设定、原句或标志性意象。仅“采纳”行会编译进 Book DNA。\n\n| ID | 维度 | 机制 | 证据摘要 | 标杆 ID | 适用范围 | 状态 |\n|---|---|---|---|---|---|---|\n| DNA-001 | chapter | 待填写 | 待填写 | B01,B02 | 全书 | 待填写 |\n',
+    'evidence/derivations/source-boundaries.md': '# 来源边界\n\n- 不进入新书：原作人名、地名、组织、设定名、金手指名称、剧情节点序列、独特意象、连续句式或原文。\n- Book DNA 仅保留跨来源可验证的抽象机制。\n- 新书的题材承诺、人物动机、世界规则、主线冲突、关键反转和结局必须独立设计。\n',
+    'evidence/derivations/character-contracts.md': '# 角色合约采纳表\n\n> 每个重要角色先锁定自主目标、当前压力或动机、已知信息边界、口吻和行动约束、禁止越界；仅“采纳”行会被章节事务、初稿、修订和冷读共同使用。\n\n| 角色 | 目标 | 压力动机 | 已知信息边界 | 口吻行动约束 | 禁止越界 | 适用范围 | 状态 |\n|---|---|---|---|---|---|---|---|\n| 待填写 | 待填写 | 待填写 | 待填写 | 待填写 | 待填写 | 全书 | 待填写 |\n',
+    'evidence/lineage/manifest.json': `${JSON.stringify({ schema_version: '1.0', generated_at: null, artifacts: [] }, null, 2)}\n`,
+    'supervision/README.md': '# 监管入口\n\n先看 dashboard.md，再看 review-queue.md、decision-log.md 和 stop-conditions.md。没有人工记录时，流程停在监管面板。\n',
+    'supervision/dashboard.md': '# 监管面板\n\n- 阶段：idle\n- 生产放行：冻结\n- 下一动作：完成来源快照、拆书、选题和读者契约\n',
+    'supervision/decision-log.md': '# 决策日志\n\n| 时间 | 决策 | 触发证据 | 影响 | 状态 |\n|---|---|---|---|---|\n',
+    'supervision/review-queue.md': '# 复核队列\n\n| 优先级 | 项目 | 验收条件 | 输出文件 | 状态 |\n|---|---|---|---|---|\n| P0 | 来源快照 | URL、时间、等级齐全 | evidence/sources/ | 待执行 |\n| P0 | 黄金三章冷读 | 读者能复述并愿意继续 | analysis/reader-rejection-*.md | 待执行 |\n',
+    'supervision/stop-conditions.md': '# 停止条件\n\n出现作文感、说明书感、看不懂、没有继续欲望或平台调性偏移时，冻结生产，记录反馈并回退到卖点、章拍和文体重构。\n',
+    'import/source-map.md': '# 导入映射\n\n尚未导入旧稿。\n',
+    'import/continuation-plan.md': '# 续写计划\n\n尚未导入旧稿。\n',
+    'manuscript/README.txt': '章节文件命名约定\n\n1. 文件名必须使用 ch-XXXX-标题.md；XXXX 是从 0001 开始的四位章号。\n2. 示例：ch-0001-停电夜.md、ch-0002-规程之外.md。\n3. 第1章也要先生成上下文包：context-pack.js 会使用 settings/ 与 outline/，不依赖前置正文。\n4. 首选事务流程：chapter-transaction begin → 写正文并更新 state → chapter-transaction finish。begin 自动生成 context-pack 并执行写前门；finish 执行字数、状态与 Canon 变更检查。\n5. 用户只说“开始”时运行 autopilot.js start，自动推进扫榜、选题、拆书、试读和生产；需要亲自把关时保持 supervised 模式。\n6. 30万字以上项目在 autopilot 模式需通过独立盲评，在 supervised 模式需真人冷读，再开始第4章。\n',
+  };
+}
+
+function run(argv = process.argv.slice(2)) {
+  const args = argsOf(argv);
+  if (!args.title) throw new CliError('USAGE', '用法: node init-project.js --title <书名> [--root 目录] [--genre 题材] [--target-words 数字]');
+  const root = path.resolve(args.root || process.cwd());
+  const title = safeName(args.title);
+  const project = path.resolve(root, title);
+  const relative = path.relative(root, project);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) throw new CliError('PATH_ESCAPE', '项目路径超出根目录', { root, project });
+  if (fs.existsSync(project) && fs.readdirSync(project).length) throw new CliError('PROJECT_EXISTS', '目标项目目录非空，未覆盖', { project });
+  fs.mkdirSync(project, { recursive: true });
+  const targetWords = Number.parseInt(args['target-words'] || '1000000', 10);
+  if (!Number.isFinite(targetWords) || targetWords <= 0) throw new CliError('INVALID_TARGET_WORDS', '目标字数必须为正整数', { value: args['target-words'] });
+  const meta = { schema_version: '1.0', title: args.title, directory_name: title, genre: args.genre || '未指定', target_words: targetWords, updated_through: 0, created_at: new Date().toISOString() };
+  const files = templates(meta);
+  files['state/project-state.json'] = `${JSON.stringify(meta, null, 2)}\n`;
+  for (const [name, contents] of Object.entries(files)) atomicWrite(path.join(project, name), contents);
+  fs.mkdirSync(path.join(project, 'manuscript'), { recursive: true });
+  const report = { ok: true, project, files_created: Object.keys(files).length, state: meta };
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  return report;
+}
+
+if (require.main === module) {
+  try { run(); } catch (error) { process.exitCode = emitError(error, 'init-project'); }
+}
+
+module.exports = { argsOf, safeName, templates, run };

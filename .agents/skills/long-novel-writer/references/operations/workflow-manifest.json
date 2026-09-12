@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0",
+  "workflow_id": "book-production",
+  "version": "1.3.0",
+  "description": "Deterministic orchestration contract for a long-form web-novel project.",
+  "policy": {
+    "freeze_definition_on_start": true,
+    "node_local_context": true,
+    "max_attempts_per_node": 3,
+    "completed_nodes_are_immutable": true,
+    "post_hoc_required_after_chapter": true
+  },
+  "nodes": [
+    {
+      "id": "build",
+      "type": "agent",
+      "purpose": "Build the story bible, author intent, current focus, and platform/reader contracts from evidence.",
+      "inputs": [
+        "project-state",
+        "platform-evidence",
+        "trend-report"
+      ],
+      "outputs": [
+        "settings/story-bible.md",
+        "settings/reader-contract.md",
+        "settings/platform-contract.md",
+        "settings/author-intent.md",
+        "state/current-focus.md"
+      ],
+      "retry": {
+        "automatic": 1,
+        "manual": true
+      }
+    },
+    {
+      "id": "character",
+      "type": "agent",
+      "purpose": "Create character goals, voices, relations, conflict dependencies, and adopted character agency contracts.",
+      "inputs": [
+        "settings/story-bible.md",
+        "settings/reader-contract.md"
+      ],
+      "outputs": [
+        "settings/characters.md",
+        "settings/relations.md",
+        "evidence/derivations/character-contracts.md"
+      ],
+      "retry": {
+        "automatic": 1,
+        "manual": true
+      }
+    },
+    {
+      "id": "story-plan",
+      "type": "agent",
+      "purpose": "Turn the premise into a commercial promise, progression, style plan, and evidence-backed adopted style signals.",
+      "inputs": [
+        "settings/story-bible.md",
+        "settings/author-intent.md",
+        "settings/characters.md",
+        "analysis/breakdown.md"
+      ],
+      "outputs": [
+        "outline/master-outline.md",
+        "settings/style-guide.md",
+        "evidence/derivations/style-signals.md"
+      ],
+      "retry": {
+        "automatic": 1,
+        "manual": true
+      }
+    },
+    {
+      "id": "outline",
+      "type": "agent",
+      "purpose": "Generate volume outlines, plot-unit plan, chapter beats and foreshadowing ledger.",
+      "inputs": [
+        "outline/master-outline.md",
+        "settings/relations.md"
+      ],
+      "outputs": [
+        "outline/plot-units.md",
+        "outline/chapter-beats.md",
+        "outline/foreshadowing-ledger.md"
+      ],
+      "retry": {
+        "automatic": 1,
+        "manual": true
+      }
+    },
+    {
+      "id": "mvp",
+      "type": "agent",
+      "purpose": "Produce the next chapter using a frozen local context pack and chapter transaction.",
+      "inputs": [
+        "outline/chapter-beats.md",
+        "state/context-pack.md",
+        "settings/author-intent.md",
+        "state/current-focus.md",
+        "state/chapter-cards/ch-XXXX.json",
+        "state/current-state.md"
+      ],
+      "outputs": [
+        "manuscript/ch-XXXX-title.md",
+        "analysis/qa-report.md"
+      ],
+      "retry": {
+        "automatic": 0,
+        "manual": true
+      }
+    },
+    {
+      "id": "post-hoc",
+      "type": "script",
+      "purpose": "Commit chapter facts, character changes, hooks and artifact hashes for continuity.",
+      "inputs": [
+        "manuscript/ch-XXXX-title.md",
+        "analysis/qa-report.md"
+      ],
+      "outputs": [
+        "state/current-state.md",
+        "state/current-focus.md",
+        "state/character-state.md",
+        "state/unresolved-hooks.md",
+        "state/chapter-memory/ch-XXXX.json",
+        "state/post-hoc-ledger.jsonl"
+      ],
+      "retry": {
+        "automatic": 0,
+        "manual": true
+      }
+    },
+    {
+      "id": "polish",
+      "type": "agent",
+      "purpose": "Run reader-first revision, anti-AI checks and platform release gates.",
+      "inputs": [
+        "manuscript/ch-XXXX-title.md",
+        "settings/style-guide.md",
+        "references/platform/fanqie-writer-classroom-playbook.md"
+      ],
+      "outputs": [
+        "analysis/qa-report.md",
+        "analysis/reader-metrics.json"
+      ],
+      "retry": {
+        "automatic": 1,
+        "manual": true
+      }
+    }
+  ]
+}

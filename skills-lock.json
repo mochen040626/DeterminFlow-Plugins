@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "long-novel-writer": {
+      "source": "Da-loong/long-novel-writer",
+      "sourceType": "github",
+      "skillPath": "skill/long-novel-writer/SKILL.md",
+      "computedHash": "e0d5b8f41b1513602787ce9030c7cb8d4739c84ee3bad2b73adba2e648183b82"
+    }
+  }
+}
